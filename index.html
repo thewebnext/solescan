@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SoleScan — AI Foot & Shoe Analyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a26;
+    --border: #2a2a3a;
+    --accent: #c8a96e;
+    --accent2: #7c6baa;
+    --text: #e8e4dc;
+    --muted: #7a7880;
+    --success: #5dbe8a;
+    --danger: #e06060;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  header {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 3rem;
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(10px);
+  }
+
+  .logo { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 900; letter-spacing: -0.02em; }
+  .logo span { color: var(--accent); }
+  .tagline { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; }
+
+  main { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 3rem 2rem 6rem; }
+
+  .hero { text-align: center; margin-bottom: 4rem; }
+  .hero h1 { font-family: 'Playfair Display', serif; font-size: clamp(2.5rem, 6vw, 4.5rem); font-weight: 900; line-height: 1.05; margin-bottom: 1rem; }
+  .hero h1 em { font-style: italic; color: var(--accent); }
+  .hero p { color: var(--muted); font-size: 1.05rem; max-width: 520px; margin: 0 auto; line-height: 1.7; }
+
+  .steps { display: flex; justify-content: center; gap: 0; margin-bottom: 3rem; }
+  .step { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1.2rem; font-family: 'DM Mono', monospace; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); border: 1px solid var(--border); margin-right: -1px; transition: all 0.3s; }
+  .step:first-child { border-radius: 40px 0 0 40px; }
+  .step:last-child { border-radius: 0 40px 40px 0; }
+  .step.active { background: var(--accent); border-color: var(--accent); color: #0a0a0f; font-weight: 500; }
+  .step-num { width: 18px; height: 18px; border-radius: 50%; background: currentColor; color: var(--bg); display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; flex-shrink: 0; }
+  .step.active .step-num { background: #0a0a0f; color: var(--accent); }
+
+  .upload-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 3rem; text-align: center; position: relative; overflow: hidden; }
+  .upload-card::before { content: ''; position: absolute; top: -100px; left: 50%; transform: translateX(-50%); width: 400px; height: 300px; background: radial-gradient(ellipse, rgba(200,169,110,0.06) 0%, transparent 70%); pointer-events: none; }
+
+  .drop-zone { border: 2px dashed var(--border); border-radius: 14px; padding: 3.5rem 2rem; cursor: pointer; transition: all 0.3s; position: relative; }
+  .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: rgba(200,169,110,0.04); }
+
+  .drop-icon { width: 72px; height: 72px; margin: 0 auto 1.5rem; }
+  .drop-icon svg { width: 100%; height: 100%; }
+
+  .drop-zone h3 { font-family: 'Playfair Display', serif; font-size: 1.4rem; margin-bottom: 0.5rem; }
+  .drop-zone p { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+
+  .btn-upload { display: inline-flex; align-items: center; gap: 0.5rem; background: var(--accent); color: #0a0a0f; border: none; border-radius: 40px; padding: 0.75rem 2rem; font-family: 'DM Mono', monospace; font-size: 0.8rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; transition: all 0.2s; }
+  .btn-upload:hover { background: #d4b87a; transform: translateY(-1px); }
+
+  .upload-tips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 2rem; }
+  .tip { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; text-align: left; }
+  .tip-icon { font-size: 1.4rem; margin-bottom: 0.4rem; }
+  .tip h4 { font-size: 0.82rem; font-weight: 500; margin-bottom: 0.2rem; }
+  .tip p { font-size: 0.75rem; color: var(--muted); line-height: 1.5; }
+
+  .preview-grid { display: grid; grid-template-columns: 1fr 1.6fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+  .preview-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+  .preview-card img { width: 100%; height: 280px; object-fit: cover; display: block; }
+  .preview-meta { padding: 1rem 1.2rem; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); }
+  .preview-meta span { font-size: 0.82rem; color: var(--muted); }
+
+  .btn-change { background: none; border: 1px solid var(--border); color: var(--text); border-radius: 20px; padding: 0.3rem 0.8rem; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; }
+  .btn-change:hover { border-color: var(--accent); color: var(--accent); }
+
+  .ai-input-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 1.5rem; }
+  .ai-input-card h3 { font-family: 'Playfair Display', serif; font-size: 1.1rem; margin-bottom: 1rem; }
+
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; margin-bottom: 0.8rem; }
+  .form-group label { display: block; font-family: 'DM Mono', monospace; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.4rem; }
+  .form-group select, .form-group input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.8rem; color: var(--text); font-size: 0.88rem; font-family: 'DM Sans', sans-serif; outline: none; transition: border-color 0.2s; }
+  .form-group select:focus, .form-group input:focus { border-color: var(--accent); }
+
+  .btn-analyze { width: 100%; background: linear-gradient(135deg, var(--accent), #b8966a); color: #0a0a0f; border: none; border-radius: 10px; padding: 0.9rem; font-family: 'DM Mono', monospace; font-size: 0.82rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: all 0.2s; margin-top: 0.5rem; }
+  .btn-analyze:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+  .btn-analyze:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  #loading-section { display: none; text-align: center; padding: 4rem 2rem; }
+  .loader-ring { width: 80px; height: 80px; margin: 0 auto 2rem; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-steps { list-style: none; display: inline-flex; flex-direction: column; gap: 0.6rem; text-align: left; }
+  .loading-steps li { display: flex; align-items: center; gap: 0.6rem; font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--muted); transition: color 0.4s; }
+  .loading-steps li.done { color: var(--success); }
+  .loading-steps li.active { color: var(--text); }
+
+  .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; }
+  .results-header h2 { font-family: 'Playfair Display', serif; font-size: 2rem; }
+  .btn-restart { display: flex; align-items: center; gap: 0.4rem; background: none; border: 1px solid var(--border); color: var(--muted); border-radius: 20px; padding: 0.4rem 1rem; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; }
+  .btn-restart:hover { border-color: var(--text); color: var(--text); }
+
+  .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+  .metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.2rem; text-align: center; position: relative; overflow: hidden; }
+  .metric-card::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: var(--accent); transform: scaleX(0); transition: transform 0.6s ease; }
+  .metric-card.revealed::after { transform: scaleX(1); }
+  .metric-val { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 700; color: var(--accent); line-height: 1; margin-bottom: 0.3rem; }
+  .metric-label { font-family: 'DM Mono', monospace; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+
+  .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+  .profile-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 1.5rem; }
+  .profile-card h3 { font-family: 'DM Mono', monospace; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 1rem; }
+
+  .badge-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.8rem; }
+  .badge { display: inline-flex; align-items: center; gap: 0.3rem; border: 1px solid var(--border); border-radius: 20px; padding: 0.3rem 0.8rem; font-size: 0.8rem; }
+  .badge.highlight { border-color: var(--accent); color: var(--accent); background: rgba(200,169,110,0.06); }
+  .badge.info { border-color: var(--accent2); color: var(--accent2); background: rgba(124,107,170,0.06); }
+  .profile-desc { font-size: 0.88rem; color: var(--muted); line-height: 1.7; }
+
+  .brand-section { margin-bottom: 1.5rem; }
+  .section-title { font-family: 'Playfair Display', serif; font-size: 1.5rem; margin-bottom: 1rem; }
+
+  .brand-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+  .brand-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.2rem; display: flex; align-items: center; gap: 1rem; transition: border-color 0.2s, transform 0.2s; }
+  .brand-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .brand-icon { width: 44px; height: 44px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
+  .brand-info { flex: 1; min-width: 0; }
+  .brand-name { font-family: 'DM Mono', monospace; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.1rem; }
+  .brand-size { font-family: 'Playfair Display', serif; font-size: 1.3rem; font-weight: 700; }
+  .brand-note { font-size: 0.72rem; color: var(--muted); }
+
+  .fit-tag { font-size: 0.68rem; padding: 0.15rem 0.5rem; border-radius: 20px; font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; }
+  .fit-tts { background: rgba(93,190,138,0.12); color: var(--success); }
+  .fit-up { background: rgba(200,169,110,0.12); color: var(--accent); }
+  .fit-down { background: rgba(124,107,170,0.12); color: var(--accent2); }
+
+  .recs-section { margin-bottom: 2rem; }
+  .shoe-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
+  .shoe-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; transition: transform 0.25s, border-color 0.25s; }
+  .shoe-card:hover { transform: translateY(-4px); border-color: var(--accent); }
+  .shoe-image { height: 160px; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 4rem; position: relative; }
+  .shoe-badge { position: absolute; top: 0.6rem; left: 0.6rem; background: var(--accent); color: #0a0a0f; font-family: 'DM Mono', monospace; font-size: 0.62rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.2rem 0.55rem; border-radius: 20px; }
+  .shoe-body { padding: 1rem; }
+  .shoe-brand { font-family: 'DM Mono', monospace; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 0.2rem; }
+  .shoe-name { font-size: 0.95rem; font-weight: 500; margin-bottom: 0.4rem; }
+  .shoe-meta { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem; }
+  .shoe-price { font-family: 'Playfair Display', serif; font-size: 1.1rem; color: var(--accent); }
+  .shoe-size { font-family: 'DM Mono', monospace; font-size: 0.75rem; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 0.2rem 0.5rem; }
+  .shoe-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+  .shoe-tag { font-size: 0.7rem; color: var(--muted); background: var(--surface2); border-radius: 4px; padding: 0.1rem 0.4rem; }
+
+  .advice-card { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 14px; padding: 1.5rem; margin-bottom: 1.5rem; }
+  .advice-card h3 { font-family: 'Playfair Display', serif; font-size: 1.1rem; margin-bottom: 0.8rem; }
+  .advice-card p { font-size: 0.9rem; color: var(--muted); line-height: 1.75; }
+
+  .error-banner { background: rgba(224,96,96,0.1); border: 1px solid rgba(224,96,96,0.3); border-radius: 10px; padding: 1rem 1.2rem; font-size: 0.88rem; color: var(--danger); margin-bottom: 1rem; display: none; }
+
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  .fade-in { animation: fadeInUp 0.5s ease forwards; }
+
+  @media (max-width: 768px) {
+    header { padding: 1rem 1.2rem; }
+    main { padding: 1.5rem 1rem 4rem; }
+    .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+    .brand-grid { grid-template-columns: repeat(2, 1fr); }
+    .shoe-grid { grid-template-columns: 1fr 1fr; }
+    .profile-grid { grid-template-columns: 1fr; }
+    .preview-grid { grid-template-columns: 1fr; }
+    .form-row { grid-template-columns: 1fr; }
+    .upload-tips { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 480px) {
+    .shoe-grid { grid-template-columns: 1fr; }
+    .brand-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Sole<span>Scan</span></div>
+  <div class="tagline">AI-Powered Foot Analysis</div>
+</header>
+
+<main>
+  <div class="hero">
+    <h1>Find your<br><em>perfect fit.</em></h1>
+    <p>Upload a photo of your foot — our AI analyzes shape, arch type, and width to tell you exactly which size to order across every major brand.</p>
+  </div>
+
+  <div class="steps">
+    <div class="step active" id="step1"><div class="step-num">1</div> Upload Photo</div>
+    <div class="step" id="step2"><div class="step-num">2</div> Confirm Details</div>
+    <div class="step" id="step3"><div class="step-num">3</div> Get Results</div>
+  </div>
+
+  <div class="error-banner" id="error-banner"></div>
+
+  <!-- Upload -->
+  <div id="upload-section">
+    <div class="upload-card">
+      <div class="drop-zone" id="drop-zone">
+        <div class="drop-icon">
+          <svg viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M36 8C26 8 18 24 16 36C14 48 18 60 36 64C54 60 58 48 56 36C54 24 46 8 36 8Z" fill="none" stroke="#c8a96e" stroke-width="2"/>
+            <path d="M28 44C28 40 30 36 36 36C42 36 44 40 44 44" fill="none" stroke="#c8a96e" stroke-width="2" stroke-linecap="round"/>
+            <path d="M24 52C24 52 28 56 36 56C44 56 48 52 48 52" fill="none" stroke="#7c6baa" stroke-width="1.5" stroke-linecap="round"/>
+            <circle cx="32" cy="30" r="2" fill="#c8a96e"/>
+            <circle cx="36" cy="28" r="2" fill="#c8a96e"/>
+            <circle cx="40" cy="30" r="2" fill="#c8a96e"/>
+          </svg>
+        </div>
+        <h3>Drop your foot photo here</h3>
+        <p>Place your foot on a flat surface, shoot from above. Clear photos yield better results.</p>
+        <button class="btn-upload" onclick="document.getElementById('file-input').click()">
+          <span>📸</span> Choose Photo
+        </button>
+        <input type="file" id="file-input" accept="image/*" style="display:none" onchange="handleFile(this.files[0])">
+      </div>
+      <div class="upload-tips">
+        <div class="tip"><div class="tip-icon">📐</div><h4>Flat surface</h4><p>Stand or place your foot flat on the floor for accurate measurements.</p></div>
+        <div class="tip"><div class="tip-icon">💡</div><h4>Good lighting</h4><p>Natural daylight or bright indoor light ensures the AI can see contours clearly.</p></div>
+        <div class="tip"><div class="tip-icon">📷</div><h4>Top-down angle</h4><p>Shoot directly from above, capturing the entire foot including heel and toes.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Preview + Form -->
+  <div id="preview-section" style="display:none">
+    <div class="preview-grid">
+      <div class="preview-card">
+        <img id="preview-img" src="" alt="Foot preview">
+        <div class="preview-meta">
+          <span id="preview-filename">photo.jpg</span>
+          <button class="btn-change" onclick="resetToUpload()">Change photo</button>
+        </div>
+      </div>
+      <div class="ai-input-card">
+        <h3>A few quick details</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Your Gender</label>
+            <select id="gender"><option value="male">Male</option><option value="female">Female</option><option value="unisex">Prefer not to say</option></select>
+          </div>
+          <div class="form-group">
+            <label>Current Shoe Size (approx)</label>
+            <input type="text" id="current-size" placeholder="e.g. US 10 or EU 43">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Primary Use</label>
+            <select id="purpose"><option value="everyday">Everyday / Casual</option><option value="running">Running / Athletic</option><option value="formal">Formal / Dress</option><option value="hiking">Hiking / Outdoor</option></select>
+          </div>
+          <div class="form-group">
+            <label>Budget (USD)</label>
+            <select id="budget"><option value="50-100">$50 – $100</option><option value="100-150" selected>$100 – $150</option><option value="150-200">$150 – $200</option><option value="200+">$200+</option></select>
+          </div>
+        </div>
+        <button class="btn-analyze" id="analyze-btn" onclick="runAnalysis()">✦ Analyze My Foot</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="loading-section" style="display:none">
+    <div class="loader-ring"></div>
+    <h3 style="font-family:'Playfair Display',serif; font-size:1.3rem; margin-bottom:1rem;">Analyzing your foot…</h3>
+    <ul class="loading-steps" id="loading-steps">
+      <li id="ls1"><span class="check">○</span> Detecting foot outline &amp; contours</li>
+      <li id="ls2"><span class="check">○</span> Measuring length &amp; width ratios</li>
+      <li id="ls3"><span class="check">○</span> Identifying arch type &amp; toe shape</li>
+      <li id="ls4"><span class="check">○</span> Calculating brand-specific conversions</li>
+      <li id="ls5"><span class="check">○</span> Finding shoe recommendations</li>
+    </ul>
+  </div>
+
+  <!-- Results -->
+  <div id="results-section" style="display:none">
+    <div class="results-header">
+      <h2>Your Foot Profile</h2>
+      <button class="btn-restart" onclick="resetToUpload()">↺ Start Over</button>
+    </div>
+    <div class="metrics-grid" id="metrics-grid"></div>
+    <div class="profile-grid" id="profile-grid"></div>
+    <div class="brand-section">
+      <div class="section-title">Your Size Across Brands</div>
+      <div class="brand-grid" id="brand-grid"></div>
+    </div>
+    <div class="advice-card" id="advice-card"></div>
+    <div class="recs-section">
+      <div class="section-title">Recommended Shoes for You</div>
+      <div class="shoe-grid" id="shoe-grid"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+let uploadedFile = null;
+let base64Data = null;
+
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+
+function handleFile(file) {
+  if (!file || !file.type.startsWith('image/')) { showError('Please upload an image file.'); return; }
+  uploadedFile = file;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    base64Data = e.target.result.split(',')[1];
+    document.getElementById('preview-img').src = e.target.result;
+    document.getElementById('preview-filename').textContent = file.name;
+    showSection('preview');
+    setStep(2);
+  };
+  reader.readAsDataURL(file);
+}
+
+function showSection(name) {
+  document.getElementById('upload-section').style.display = name === 'upload' ? 'block' : 'none';
+  document.getElementById('preview-section').style.display = name === 'preview' ? 'block' : 'none';
+  document.getElementById('loading-section').style.display = name === 'loading' ? 'block' : 'none';
+  document.getElementById('results-section').style.display = name === 'results' ? 'block' : 'none';
+}
+
+function setStep(n) {
+  for (let i = 1; i <= 3; i++) document.getElementById('step' + i).classList.toggle('active', i === n);
+}
+
+function resetToUpload() {
+  uploadedFile = null; base64Data = null;
+  document.getElementById('file-input').value = '';
+  showSection('upload'); setStep(1); hideError();
+}
+
+function showError(msg) {
+  const b = document.getElementById('error-banner');
+  b.textContent = msg; b.style.display = 'block';
+}
+function hideError() { document.getElementById('error-banner').style.display = 'none'; }
+
+async function runAnalysis() {
+  if (!base64Data) return;
+  hideError(); setStep(3); showSection('loading');
+
+  const steps = ['ls1','ls2','ls3','ls4','ls5'];
+  let si = 0;
+  const stepInterval = setInterval(() => {
+    if (si > 0) {
+      const prev = document.getElementById(steps[si-1]);
+      prev.classList.remove('active'); prev.classList.add('done');
+      prev.querySelector('.check').textContent = '✓';
+    }
+    if (si < steps.length) { document.getElementById(steps[si]).classList.add('active'); si++; }
+    else clearInterval(stepInterval);
+  }, 700);
+
+  const gender = document.getElementById('gender').value;
+  const currentSize = document.getElementById('current-size').value;
+  const purpose = document.getElementById('purpose').value;
+  const budget = document.getElementById('budget').value;
+
+  const prompt = `You are an expert podiatrist and shoe fitting specialist AI. Analyze this foot photo carefully.
+
+User details: Gender: ${gender}, Current approx size: ${currentSize || 'Unknown'}, Use: ${purpose}, Budget: $${budget}
+
+Respond ONLY with valid JSON (no markdown, no extra text):
+
+{
+  "metrics": {
+    "estimated_length_cm": "<number>",
+    "estimated_width_cm": "<number>",
+    "us_size": "<e.g. 10 or 10.5>",
+    "eu_size": "<e.g. 43>",
+    "uk_size": "<e.g. 9>"
+  },
+  "foot_profile": {
+    "arch_type": "<Flat / Normal / High>",
+    "arch_description": "<2 sentences>",
+    "toe_shape": "<Egyptian / Greek / Roman / Peasant / German>",
+    "toe_description": "<1 sentence>",
+    "width": "<Narrow / Medium / Wide / Extra Wide>",
+    "width_description": "<1 sentence>",
+    "notable_features": ["<feature1>", "<feature2>"]
+  },
+  "brand_sizes": [
+    {"brand": "Nike", "size": "<US size>", "fit_advice": "<true to size|size up|size down>", "note": "<short note>"},
+    {"brand": "Adidas", "size": "<>", "fit_advice": "<>", "note": "<>"},
+    {"brand": "New Balance", "size": "<>", "fit_advice": "<>", "note": "<>"},
+    {"brand": "Converse", "size": "<>", "fit_advice": "<>", "note": "<>"},
+    {"brand": "Vans", "size": "<>", "fit_advice": "<>", "note": "<>"},
+    {"brand": "Skechers", "size": "<>", "fit_advice": "<>", "note": "<>"},
+    {"brand": "ASICS", "size": "<>", "fit_advice": "<>", "note": "<>"},
+    {"brand": "Puma", "size": "<>", "fit_advice": "<>", "note": "<>"},
+    {"brand": "Reebok", "size": "<>", "fit_advice": "<>", "note": "<>"}
+  ],
+  "expert_advice": "<3-4 sentences of personalized podiatric advice>",
+  "shoe_recommendations": [
+    {"brand": "<>", "model": "<real model>", "emoji": "👟", "price_usd": "<$XXX>", "size_to_order": "<US size>", "fit_badge": "<Best Fit|Great Value|Top Pick>", "reason": "<why this fits>", "tags": ["<tag1>", "<tag2>", "<tag3>"]},
+    {"brand": "<>", "model": "<>", "emoji": "👟", "price_usd": "<>", "size_to_order": "<>", "fit_badge": "<>", "reason": "<>", "tags": []},
+    {"brand": "<>", "model": "<>", "emoji": "👟", "price_usd": "<>", "size_to_order": "<>", "fit_badge": "<>", "reason": "<>", "tags": []},
+    {"brand": "<>", "model": "<>", "emoji": "👟", "price_usd": "<>", "size_to_order": "<>", "fit_badge": "<>", "reason": "<>", "tags": []},
+    {"brand": "<>", "model": "<>", "emoji": "👟", "price_usd": "<>", "size_to_order": "<>", "fit_badge": "<>", "reason": "<>", "tags": []},
+    {"brand": "<>", "model": "<>", "emoji": "👟", "price_usd": "<>", "size_to_order": "<>", "fit_badge": "<>", "reason": "<>", "tags": []}
+  ]
+}
+
+Recommend real mid-range models within budget $${budget} for ${purpose}. Be specific with model names.`;
+
+  try {
+    // Uses /api/analyze proxy — API key stays on server
+    const response = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1800,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: uploadedFile.type, data: base64Data } },
+            { type: 'text', text: prompt }
+          ]
+        }]
+      })
+    });
+
+    clearInterval(stepInterval);
+    steps.forEach(id => {
+      const el = document.getElementById(id);
+      el.classList.remove('active'); el.classList.add('done');
+      el.querySelector('.check').textContent = '✓';
+    });
+
+    const data = await response.json();
+    if (data.error) throw new Error(data.error.message || data.error || 'API error');
+
+    const rawText = data.content.map(i => i.text || '').join('');
+    let parsed;
+    try {
+      parsed = JSON.parse(rawText.replace(/```json|```/g, '').trim());
+    } catch(e) {
+      throw new Error('Could not parse response. Please try again.');
+    }
+
+    await new Promise(r => setTimeout(r, 400));
+    renderResults(parsed);
+
+  } catch (err) {
+    clearInterval(stepInterval);
+    showSection('preview'); setStep(2);
+    showError('Analysis failed: ' + err.message);
+  }
+}
+
+function renderResults(data) {
+  showSection('results');
+  const m = data.metrics;
+  document.getElementById('metrics-grid').innerHTML = [
+    { val: m.us_size, label: 'US Size' },
+    { val: m.eu_size, label: 'EU Size' },
+    { val: m.uk_size, label: 'UK Size' },
+    { val: (m.estimated_length_cm || '?') + ' cm', label: 'Est. Length' }
+  ].map((item, i) => `
+    <div class="metric-card fade-in" style="animation-delay:${i*0.07}s">
+      <div class="metric-val">${item.val}</div>
+      <div class="metric-label">${item.label}</div>
+    </div>`).join('');
+  setTimeout(() => document.querySelectorAll('.metric-card').forEach(c => c.classList.add('revealed')), 600);
+
+  const fp = data.foot_profile;
+  document.getElementById('profile-grid').innerHTML = `
+    <div class="profile-card fade-in">
+      <h3>Arch & Toe Shape</h3>
+      <div class="badge-row">
+        <span class="badge highlight">⟁ ${fp.arch_type} Arch</span>
+        <span class="badge info">◎ ${fp.toe_shape} Toe</span>
+      </div>
+      <p class="profile-desc">${fp.arch_description} ${fp.toe_description}</p>
+    </div>
+    <div class="profile-card fade-in">
+      <h3>Width & Features</h3>
+      <div class="badge-row">
+        <span class="badge highlight">↔ ${fp.width} Width</span>
+        ${(fp.notable_features||[]).map(f=>`<span class="badge">${f}</span>`).join('')}
+      </div>
+      <p class="profile-desc">${fp.width_description}</p>
+    </div>`;
+
+  const brandIcons = {'Nike':'🔄','Adidas':'🌐','New Balance':'🔵','Converse':'⭐','Vans':'♦','Skechers':'🟦','ASICS':'🔷','Puma':'🐆','Reebok':'🔺'};
+  const fitClass = {'true to size':'fit-tts','size up':'fit-up','size down':'fit-down'};
+  document.getElementById('brand-grid').innerHTML = (data.brand_sizes||[]).map((b,i)=>`
+    <div class="brand-card fade-in" style="animation-delay:${i*0.05}s">
+      <div class="brand-icon">${brandIcons[b.brand]||'👟'}</div>
+      <div class="brand-info">
+        <div class="brand-name">${b.brand}</div>
+        <div class="brand-size">US ${b.size}</div>
+        <div class="brand-note">${b.note}</div>
+      </div>
+      <span class="fit-tag ${fitClass[b.fit_advice]||'fit-tts'}">${b.fit_advice||'TTS'}</span>
+    </div>`).join('');
+
+  document.getElementById('advice-card').innerHTML = `<h3>✦ Expert Recommendation</h3><p>${data.expert_advice}</p>`;
+
+  document.getElementById('shoe-grid').innerHTML = (data.shoe_recommendations||[]).map((s,i)=>`
+    <div class="shoe-card fade-in" style="animation-delay:${i*0.07}s">
+      <div class="shoe-image">${s.emoji||'👟'}<span class="shoe-badge">${s.fit_badge||'Great Fit'}</span></div>
+      <div class="shoe-body">
+        <div class="shoe-brand">${s.brand}</div>
+        <div class="shoe-name">${s.model}</div>
+        <div class="shoe-meta">
+          <span class="shoe-price">${s.price_usd}</span>
+          <span class="shoe-size">US ${s.size_to_order}</span>
+        </div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-bottom:0.5rem;line-height:1.5">${s.reason}</div>
+        <div class="shoe-tags">${(s.tags||[]).map(t=>`<span class="shoe-tag">${t}</span>`).join('')}</div>
+      </div>
+    </div>`).join('');
+}
+</script>
+</body>
+</html>
