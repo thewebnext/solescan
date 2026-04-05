@@ -1,13 +1,12 @@
 const express = require('express');
 const path = require('path');
 const app = express();
+
 app.use(express.json({ limit: '20mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-
-app.get('/debug', (req, res) => {
-  const key = process.env.ANTHROPIC_API_KEY;
-  res.send(key ? 'KEY OK: ' + key.slice(0,15) : 'NO KEY FOUND');
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.post('/api/analyze', async (req, res) => {
@@ -16,11 +15,18 @@ app.post('/api/analyze', async (req, res) => {
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
       body: JSON.stringify(req.body)
     });
     res.json(await r.json());
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-app.listen(process.env.PORT || 3000, () => console.log('Running'));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log('SoleScan running on port ' + PORT));
